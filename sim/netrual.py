@@ -26,7 +26,6 @@ class Component:
     def last_minted(self):
         return self.minted[self.last_cycle]
 
-
     def get_cycle(self, winner: str) -> list:
         return [
             c
