@@ -36,6 +36,7 @@ class Component:
             self.accounts[sender] = amount
         else:
             self.accounts[sender] += amount
+        return
 
     def update_status(self, cycle):
         last_minted = self.last_minted
@@ -58,7 +59,8 @@ class Component:
 
         if self.cycle not in self.minted:
             self.minted[self.cycle] = params
-        if bid > self.minted[self.cycle]['bid']:
+            return True
+        elif bid > self.minted[self.cycle]['bid']:
             self.minted.update(**params)
             return True
         return False
