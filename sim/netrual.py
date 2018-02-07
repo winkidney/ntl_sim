@@ -7,6 +7,10 @@ class Component:
     last_cycle = 0
     current_cycle = 0
     accounts = {}
+    reserve = 0
+
+    def __init__(self, token):
+        self.token = token
 
     @property
     def cycle(self) -> int:
@@ -16,30 +20,40 @@ class Component:
         return cycle
 
     @property
-    def reserve(self) -> dict:
-        return {
-            v['sender']: v['bid']
-            for r, v in self.minted.items()
-            if r != self.cycle
-        }
-
-    @property
-    def accounts(self):
-        pass
-
-    @property
     def last_minted(self):
         return self.minted[self.last_cycle]
+
+    @property
+    def totaly_supply(self):
+        return sum(list(self.reserve.values()))
+
+    def get_cycle(self, winner: str) -> list:
+        return [
+            c
+            for c, v
+            in self.minted.items()
+            if v['sender'] == winner
+        ]
 
     def send_token(self, sender, amount):
         if sender not in self.accounts:
             self.accounts[sender] = amount
         else:
             self.accounts[sender] += amount
-        return
+        return False
+
+    def burn_token(self, sender, amount) -> bool:
+        if not sender.balance >= amount:
+            return False
+        else:
+            sender.balance -= amount
+            return True
 
     def update_status(self, cycle):
         last_minted = self.last_minted
+        self.send_token(self.last_minted['sender'], 1000)
+        self.reserve += self.last_minted['bid']
+
         self.min_bid = self.last_minted['bid']
         self.accounts[last_minted['sender']] = last_minted['bid']
         self.last_cycle = self.current_cycle
@@ -68,5 +82,14 @@ class Component:
     def auction(self, sender: str, bid: int) -> bool:
         return self.verify_bid(bid) and self.update_auction(bid, sender)
 
-    def redeem(self, sender: int, quantity: int) -> bool:
-        pass
+    def redeem(self, sender: int, quantity: int) -> int:
+        redeemed = (self.min_bid - quantity) * quantity / 2
+        if not redeemed <= self.reserve:
+            return False
+
+        burned = self.burn_token(sender, quantity)
+        if not burned:
+            return False
+        if burned:
+            self.min_bid = self.min_bid - quantity
+            return redeemed
