@@ -17,14 +17,14 @@ class Component:
 
     @property
     def cycle(self) -> int:
-        cycle = int(self.timestamp) % self.auction_window
+        cycle = int(int(self.timestamp) / self.auction_window)
         if cycle > self.current_cycle:
             self.update_status(cycle)
         return cycle
 
     @property
     def last_minted(self):
-        return self.minted[self.last_cycle]
+        return self.minted.get(self.last_cycle)
 
     def get_cycle(self, winner: str) -> list:
         return [
@@ -42,21 +42,29 @@ class Component:
         return False
 
     def burn_token(self, sender, amount) -> bool:
-        if not sender.balance >= amount:
+        if not sender in self.accounts:
+            return False
+        if not self.accounts[sender] >= amount:
             return False
         else:
-            sender.balance -= amount
+            self.accounts[sender] -= amount
             return True
 
     def update_status(self, cycle):
-        last_minted = self.last_minted
-        self.send_token(self.last_minted['sender'], 1000)
-        self.reserve += self.last_minted['bid']
+        self.update_cycle(cycle)
+        if not self.last_cycle == 0:
+            self.record_minted()
 
-        self.min_bid = self.last_minted['bid']
-        self.accounts[last_minted['sender']] = last_minted['bid']
+    def update_cycle(self, cycle):
         self.last_cycle = self.current_cycle
         self.current_cycle = cycle
+
+    def record_minted(self):
+        self.send_token(self.last_minted['sender'], 1000)
+        self.reserve += self.last_minted['bid']
+        self.min_bid = self.last_minted['bid']
+        self.send_token(self.last_minted['sender'], 1000)
+        self.reserve += self.last_minted['bid']
 
     def balance(self, sender) -> int:
         return self.accounts.get(sender, 0)
