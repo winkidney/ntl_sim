@@ -12,6 +12,9 @@ class Component:
     def __init__(self, token):
         self.token = token
 
+    def __call__(self, timestamp: int):
+        self.timestamp = timestamp
+
     @property
     def cycle(self) -> int:
         cycle = int(self.timestamp) % self.auction_window
@@ -62,7 +65,7 @@ class Component:
     def balance(self, sender) -> int:
         return self.accounts.get(sender, 0)
 
-    def verify_bid(self, bid):
+    def verify_bid(self, bid) -> bool:
         return bid > self.min_bid
 
     def update_auction(self, bid: int, sender: str) -> True:
@@ -83,7 +86,7 @@ class Component:
         return self.verify_bid(bid) and self.update_auction(bid, sender)
 
     def redeem(self, sender: int, quantity: int) -> int:
-        redeemed = (self.min_bid - quantity) * quantity / 2
+        redeemed = (self.min_bid / 1000 - quantity) * quantity / 2
         if not redeemed <= self.reserve:
             return False
 
