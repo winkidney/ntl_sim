@@ -64,8 +64,6 @@ class Component:
         self.send_token(self.last_minted['sender'], 1000)
         self.reserve += self.last_minted['bid']
         self.min_bid = self.last_minted['bid']
-        self.send_token(self.last_minted['sender'], 1000)
-        self.reserve += self.last_minted['bid']
 
     def balance(self, sender) -> int:
         return self.accounts.get(sender, 0)
