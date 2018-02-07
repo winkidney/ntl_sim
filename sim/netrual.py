@@ -4,7 +4,7 @@ class Component:
     minted = {}
     timestamp = 0
     auction_window = 3600
-    last_cycle = 0
+    last_cycle = -1
     current_cycle = 0
     accounts = {}
     reserve = 0
@@ -14,6 +14,7 @@ class Component:
 
     def __call__(self, timestamp: int):
         self.timestamp = timestamp
+        return self
 
     @property
     def cycle(self) -> int:
@@ -42,7 +43,7 @@ class Component:
         return False
 
     def burn_token(self, sender, amount) -> bool:
-        if not sender in self.accounts:
+        if sender not in self.accounts:
             return False
         if not self.accounts[sender] >= amount:
             return False
@@ -52,7 +53,7 @@ class Component:
 
     def update_status(self, cycle):
         self.update_cycle(cycle)
-        if not self.last_cycle == 0:
+        if not self.last_cycle == -1:
             self.record_minted()
 
     def update_cycle(self, cycle):
@@ -99,4 +100,5 @@ class Component:
             return False
         if burned:
             self.min_bid = self.min_bid - quantity
+            self.reserve -= redeemed
             return redeemed
