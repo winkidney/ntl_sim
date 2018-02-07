@@ -26,9 +26,6 @@ class Component:
     def last_minted(self):
         return self.minted[self.last_cycle]
 
-    @property
-    def totaly_supply(self):
-        return sum(list(self.reserve.values()))
 
     def get_cycle(self, winner: str) -> list:
         return [
