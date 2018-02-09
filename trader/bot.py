@@ -1,4 +1,6 @@
 from collections import defaultdict
+import logging
+
 import random
 
 import pandas as pd
@@ -47,7 +49,10 @@ class Exchange:
         for symbol in self.symbols:
             component = self.components[symbol]
             prices = self.prices[symbol]
-            ts = prices['timestamp'][self.current_index]
+            try:
+                ts = prices['timestamp'][self.current_index]
+            except KeyError:
+                raise ValueError("Data is gone.")
             component(ts)
             self.current_prices[symbol] = prices['price_usdt'][self.current_index]
         self.current_index += 1
@@ -139,6 +144,7 @@ class Trader:
             source_token, target_token, premium_rate=premium_rate
         )
         flat_relative_price = self.get_token_relative_price(source_token, target_token)
+
         if ntl_relative_price < flat_relative_price:
             return True
         return False
@@ -162,17 +168,22 @@ class Trader:
     def do_transition(self, source, target):
         price = self.exchange.get_ntl_min_price(source)
         source_cost = price * self.exchange.get_ntl_each_round()
+
         if self.assets[source] < source_cost:
+            print(
+                "Source cost is too much, %s, price is %s"
+                % (source_cost, price)
+            )
             return False
         ntl_got = self.exchange.buy(source_cost, source, self.name)
-        print(
-            "You do auction with cycle: %s ntl_got: %s"
-            % (
-                self.exchange.components['EOS'].cycle,
-                ntl_got
-            )
-        )
         if ntl_got is None:
+            print(
+                "You do auction with cycle: %s ntl_got: %s"
+                % (
+                    self.exchange.components['EOS'].cycle,
+                    ntl_got,
+                )
+            )
             return False
         self.assets[NTL] += ntl_got
         self.assets[source] -= source_cost
@@ -200,19 +211,67 @@ class Trader:
 
 
 def main():
+    ntl_prices = defaultdict(list)
+    reversed_amounts = defaultdict(list)
+    flat_prices = defaultdict(list)
+    ntl_total_supply_amounts = defaultdict(list)
+    ts = []
+
     exchange = Exchange(['EOS', 'OMG'])
     trader = Trader(
-        1000 * 10, 1000 * 10,
+        1000000000000 * 1000, 1000000000000 * 1000,
         exchange,
     )
     exchange.bootstrap()
     fn = None
+    counter = 0
     while True:
-        exchange.update_kline()
+        counter += 1
+        try:
+            exchange.update_kline()
+        except ValueError:
+            break
+        ts.append(exchange.components['EOS'].timestamp)
+        for symbol in exchange.symbols:
+            ntl_prices[symbol].append(
+                exchange.components[symbol].min_bid
+            )
+            reversed_amounts[symbol].append(
+                exchange.components[symbol].reserve
+            )
+            ntl_total_supply_amounts[symbol].append(
+                exchange.components[symbol].total_supply
+            )
+            flat_prices[symbol].append(
+                exchange.get_flat_price(symbol)
+            )
         if callable(fn):
             fn()
         fn = trader.one_cycle()
-        print(trader.assets)
-        time.sleep(1)
 
-main()
+    import pandas as pd
+    dfs = []
+    for symbol in exchange.symbols:
+        all_data = {}
+        all_data['ntl_%s_price' % symbol] = pd.Series(
+            ntl_prices[symbol],
+            index=ts,
+        )
+        all_data['%s_reserved' % symbol] = pd.Series(
+            reversed_amounts[symbol],
+            index=ts,
+        )
+        all_data['ntl_total_supply'] = pd.Series(
+            ntl_total_supply_amounts[symbol],
+            index=ts,
+        )
+        all_data['%s_flat_price' % symbol] = pd.Series(
+            flat_prices[symbol],
+            index=ts,
+        )
+        dfs.append(
+            pd.DataFrame(all_data)
+        )
+    return dfs
+
+dfs = main()
