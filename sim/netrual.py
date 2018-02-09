@@ -1,5 +1,7 @@
-class Component:
+NLT_accounts = {}
 
+
+class Component:
     min_bid = 1
     minted = {}
     timestamp = 0
@@ -7,7 +9,7 @@ class Component:
     last_cycle = -1
     start_timestamp = -1
     current_cycle = 0
-    accounts = {}
+    accounts = NLT_accounts
     reserve = 0
 
     def __init__(self, token):
@@ -23,7 +25,11 @@ class Component:
     def cycle(self) -> int:
         cycle = int((self.timestamp - self.start_timestamp) / self.auction_window)
         if cycle > self.current_cycle:
+            print('==' * 20)
             print('New cycle %s' % cycle)
+            print('Current balance %s' % self.accounts)
+            print('Current minted %s' % self.minted)
+            print('==' * 20)
             self.update_status(cycle)
         return cycle
 
@@ -45,6 +51,8 @@ class Component:
             self.accounts[sender] = amount
         else:
             self.accounts[sender] += amount
+        print('Current balance %s' % self.accounts)
+
         return False
 
     def burn_token(self, sender, amount) -> bool:
@@ -98,14 +106,22 @@ class Component:
         return self.verify_bid(bid) and self.update_auction(bid, sender)
 
     def redeem(self, sender: str, quantity: int) -> int:
+        print('==' * 20)
+        print('Redeeming Current accounts %s, redeem %s for %s' % (self.accounts, quantity, sender))
+
+        assert self.cycle > 0
         redeemed = self.reserve / self.total_supply * quantity
         if not redeemed <= self.reserve:
+            print('Redeem request is less than reserve')
             return False
 
         burned = self.burn_token(sender, quantity)
         if not burned:
+            print('Failed on Burning')
             return False
         if burned:
             self.min_bid = self.min_bid - quantity
             self.reserve -= redeemed
+            print('Redeem Finished Current accounts %s' % self.accounts)
+            print('==' * 20)
             return redeemed
