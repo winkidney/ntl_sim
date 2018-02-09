@@ -1,6 +1,6 @@
 class Component:
 
-    min_bid = 0
+    min_bid = 1
     minted = {}
     timestamp = 0
     auction_window = 3600
@@ -53,7 +53,7 @@ class Component:
 
     def update_status(self, cycle):
         self.update_cycle(cycle)
-        if not self.last_cycle == -1:
+        if not self.last_cycle > 0:
             self.record_minted()
 
     def update_cycle(self, cycle):
@@ -81,7 +81,7 @@ class Component:
             self.minted[self.cycle] = params
             return True
         elif bid > self.minted[self.cycle]['bid']:
-            self.minted.update(**params)
+            self.minted[self.cycle].update(**params)
             return True
         return False
 
