@@ -19,18 +19,27 @@ class Component:
         if self.start_timestamp == -1:
             self.start_timestamp = timestamp
         self.timestamp = timestamp
+        cycle = int((self.timestamp - self.start_timestamp) / self.auction_window)
+        if cycle > self.current_cycle:
+            print('==' * 20)
+            print('%s New cycle %s' % (self.token, cycle))
+            print('Current balance %s' % self.accounts)
+            print('Current minted %s' % self.minted)
+            print('==' * 20)
+            self.update_status(cycle)
+
         return self
 
     @property
     def cycle(self) -> int:
         cycle = int((self.timestamp - self.start_timestamp) / self.auction_window)
-        if cycle > self.current_cycle:
-            print('==' * 20)
-            print('New cycle %s' % cycle)
-            print('Current balance %s' % self.accounts)
-            print('Current minted %s' % self.minted)
-            print('==' * 20)
-            self.update_status(cycle)
+        # if cycle > self.current_cycle:
+        #     print('==' * 20)
+        #     print('%s New cycle %s' % (self.token, cycle))
+        #     print('Current balance %s' % self.accounts)
+        #     print('Current minted %s' % self.minted)
+        #     print('==' * 20)
+        #     self.update_status(cycle)
         return cycle
 
     @property
@@ -74,9 +83,11 @@ class Component:
         self.current_cycle = cycle
 
     def record_minted(self):
-        self.send_token(self.last_minted['sender'], 1000)
-        self.reserve += self.last_minted['bid']
-        self.min_bid = self.last_minted['bid']
+        if self.last_minted:
+            print('Found last Winner')
+            self.send_token(self.last_minted['sender'], 1000)
+            self.reserve += self.last_minted['bid']
+            self.min_bid = self.last_minted['bid']
 
     def balance(self, sender) -> int:
         return self.accounts.get(sender, 0)
