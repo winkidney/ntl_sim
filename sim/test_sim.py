@@ -22,3 +22,4 @@ def test_basic():
     C(start + gap * 2 + 1).auction('satoshi', 1000)
     assert C.cycle == 2
     assert C.balance('satoshi') == 2000
+    assert C.redeem('satoshi', 1000)

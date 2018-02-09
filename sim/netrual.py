@@ -73,6 +73,10 @@ class Component:
     def balance(self, sender) -> int:
         return self.accounts.get(sender, 0)
 
+    @property
+    def total_supply(self) -> int:
+        return sum(list(self.accounts.values()))
+
     def verify_bid(self, bid) -> bool:
         return bid > self.min_bid
 
@@ -94,7 +98,7 @@ class Component:
         return self.verify_bid(bid) and self.update_auction(bid, sender)
 
     def redeem(self, sender: str, quantity: int) -> int:
-        redeemed = (self.min_bid / 1000 - quantity) * quantity / 2
+        redeemed = self.reserve / self.total_supply * quantity
         if not redeemed <= self.reserve:
             return False
 
