@@ -55,7 +55,7 @@ class Exchange:
     def bootstrap(self):
         self.update_kline()
         for component in self.components.values():
-            component.auction('the-god', 1000)
+            component.auction('the-god', 100000000)
 
     def get_flat_price(self, symbol):
         return self.current_prices[symbol]
