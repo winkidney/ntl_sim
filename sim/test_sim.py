@@ -4,13 +4,21 @@ C = Component('EOS')
 
 
 def test_basic():
-    # step 0:
-    C(1).auction('satoshi', 100)
-    assert C(2).auction('satoshi', 50) is False
-    # step 1:
-    C(3).auction('satoshi', 200)
+    start = 1234566
+    gap = 3600
+    # cycle 0:
+    assert C.cycle == 0
+    C(start).auction('satoshi', 100)
+    assert C(start + 1).auction('satoshi', 50) is False
+    C(start + 20).auction('satoshi', 200)
 
-    C(3601).auction('satoshi', 1000)
-    assert C(3601).min_bid == 100
-    assert C.reserve == 100
+    C(start + gap + 1).auction('satoshi', 1000)
+    assert C.cycle == 1
+
+    assert C.min_bid == 200
+    assert C.reserve == 200
     assert C.balance('satoshi') == 1000
+
+    C(start + gap * 2 + 1).auction('satoshi', 1000)
+    assert C.cycle == 2
+    assert C.balance('satoshi') == 2000

@@ -23,6 +23,7 @@ class Component:
     def cycle(self) -> int:
         cycle = int((self.timestamp - self.start_timestamp) / self.auction_window)
         if cycle > self.current_cycle:
+            print('New cycle %s' % cycle)
             self.update_status(cycle)
         return cycle
 
@@ -39,6 +40,7 @@ class Component:
         ]
 
     def send_token(self, sender, amount):
+        print('sent %s NTL to %s' % (amount, sender))
         if sender not in self.accounts:
             self.accounts[sender] = amount
         else:
@@ -56,7 +58,7 @@ class Component:
 
     def update_status(self, cycle):
         self.update_cycle(cycle)
-        if not self.last_cycle > 0:
+        if self.last_cycle >= 0:
             self.record_minted()
 
     def update_cycle(self, cycle):
