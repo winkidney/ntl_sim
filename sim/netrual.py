@@ -5,6 +5,7 @@ class Component:
     timestamp = 0
     auction_window = 3600
     last_cycle = -1
+    start_timestamp = -1
     current_cycle = 0
     accounts = {}
     reserve = 0
@@ -13,12 +14,14 @@ class Component:
         self.token = token
 
     def __call__(self, timestamp: int):
+        if self.start_timestamp == -1:
+            self.start_timestamp = timestamp
         self.timestamp = timestamp
         return self
 
     @property
     def cycle(self) -> int:
-        cycle = int(int(self.timestamp) / self.auction_window)
+        cycle = int((self.timestamp - self.start_timestamp) / self.auction_window)
         if cycle > self.current_cycle:
             self.update_status(cycle)
         return cycle
