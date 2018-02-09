@@ -19,28 +19,18 @@ class Component:
         self.timestamp = timestamp
         if self.start_timestamp == -1:
             self.start_timestamp = timestamp
-        cycle = int((self.timestamp - self.start_timestamp) / self.auction_window)
-        if cycle > self.current_cycle:
+        if self.cycle > self.current_cycle:
             print('==' * 20)
-            print('%s New cycle %s' % (self.token, cycle))
+            print('%s New cycle %s' % (self.token, self.cycle))
             print('Current balance %s' % self.accounts)
             print('Current minted %s' % self.minted)
             print('==' * 20)
-            self.update_status(cycle)
-
+            self.update_status()
         return self
 
     @property
     def cycle(self) -> int:
-        cycle = int((self.timestamp - self.start_timestamp) / self.auction_window)
-        # if cycle > self.current_cycle:
-        #     print('==' * 20)
-        #     print('%s New cycle %s' % (self.token, cycle))
-        #     print('Current balance %s' % self.accounts)
-        #     print('Current minted %s' % self.minted)
-        #     print('==' * 20)
-        #     self.update_status(cycle)
-        return cycle
+        return int((self.timestamp - self.start_timestamp) / self.auction_window)
 
     @property
     def last_minted(self):
@@ -73,8 +63,8 @@ class Component:
             self.accounts[sender] -= amount
             return True
 
-    def update_status(self, cycle):
-        self.update_cycle(cycle)
+    def update_status(self):
+        self.update_cycle(self.cycle)
         if self.last_cycle >= 0:
             self.record_minted()
 
