@@ -16,9 +16,9 @@ class Component:
         self.token = token
 
     def __call__(self, timestamp: int):
+        self.timestamp = timestamp
         if self.start_timestamp == -1:
             self.start_timestamp = timestamp
-        self.timestamp = timestamp
         cycle = int((self.timestamp - self.start_timestamp) / self.auction_window)
         if cycle > self.current_cycle:
             print('==' * 20)
