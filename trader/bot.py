@@ -1,6 +1,4 @@
 from collections import defaultdict
-from decimal import Decimal as D
-
 import random
 
 import pandas as pd
@@ -30,7 +28,7 @@ def get_usdt_price_pandas(target_symbol):
 
 
 class Exchange:
-    num_ntl_each_round = D('1000')
+    num_ntl_each_round = 1000
 
     def __init__(self, symbols):
         """
@@ -40,7 +38,7 @@ class Exchange:
         self.symbols = symbols
         self.prices = {}
         self.components = {}
-        self.current_prices = defaultdict(lambda : D('0'))
+        self.current_prices = defaultdict(int)
         for symbol in symbols:
             self.components[symbol] = Component(symbol)
             self.prices[symbol] = get_usdt_price_pandas(symbol)
@@ -51,9 +49,7 @@ class Exchange:
             prices = self.prices[symbol]
             ts = prices['timestamp'][self.current_index]
             component(ts)
-            self.current_prices[symbol] = D(
-                prices['price_usdt'][self.current_index]
-            )
+            self.current_prices[symbol] = prices['price_usdt'][self.current_index]
         self.current_index += 1
 
     def bootstrap(self):
@@ -110,7 +106,7 @@ class Trader:
         self.assets = {
             EOS: num_eos,
             OMG: num_omg,
-            NTL: D('0'),
+            NTL: 0,
         }
         self.exchange = exchange
 
@@ -120,7 +116,7 @@ class Trader:
 
     @staticmethod
     def get_premium_rate():
-        return D(random.randint(1, 20)) / D('100')
+        return random.randint(1, 20) / 100.0
 
     def get_ntl_relative_price(
             self, source_token_name, target_token_name, premium_rate=None
@@ -155,43 +151,67 @@ class Trader:
         if self.should_convert2target(
             EOS, OMG, premium_rate=premium_rate
         ):
-            self.do_transition(EOS, OMG)
-            return
+            if self.do_transition(EOS, OMG):
+                return lambda : self.do_redeem(EOS, OMG)
         if self.should_convert2target(
             OMG, EOS, premium_rate=premium_rate
         ):
-            self.do_transition(OMG, EOS)
-            return
+            if self.do_transition(OMG, EOS):
+                return lambda: self.do_redeem(OMG, EOS)
 
     def do_transition(self, source, target):
         price = self.exchange.get_ntl_min_price(source)
         source_cost = price * self.exchange.get_ntl_each_round()
         if self.assets[source] < source_cost:
-            return
+            return False
         ntl_got = self.exchange.buy(source_cost, source, self.name)
+        print(
+            "You do auction with cycle: %s ntl_got: %s"
+            % (
+                self.exchange.components['EOS'].cycle,
+                ntl_got
+            )
+        )
         if ntl_got is None:
-            return
+            return False
         self.assets[NTL] += ntl_got
         self.assets[source] -= source_cost
+        return True
+
+    def do_redeem(self, source, target):
         num_target_got = self.exchange.redeem(
             self.assets[NTL],
             target,
             self.name
         )
-        self.assets[NTL] = D('0')
+        if num_target_got is None:
+            print(
+                "%s: Failed to redeem, you have %s, accounts %s"
+                % (
+                    self.exchange.components['EOS'].cycle,
+                    self.assets,
+                    self.exchange.components['EOS'].accounts,
+                )
+            )
+            return False
+        self.assets[NTL] = 0
         self.assets[target] += num_target_got
+        return True
 
 
 def main():
     exchange = Exchange(['EOS', 'OMG'])
     trader = Trader(
-        D('1000') * D('10'), D('1000') * D('10'),
+        1000 * 10, 1000 * 10,
         exchange,
     )
     exchange.bootstrap()
+    fn = None
     while True:
         exchange.update_kline()
-        trader.one_cycle()
+        if callable(fn):
+            fn()
+        fn = trader.one_cycle()
         print(trader.assets)
         time.sleep(1)
 

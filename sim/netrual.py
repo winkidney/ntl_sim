@@ -3,7 +3,7 @@ class Component:
     min_bid = 1
     minted = {}
     timestamp = 0
-    auction_window = 3600
+    auction_window = 300
     last_cycle = -1
     start_timestamp = -1
     current_cycle = 0
