@@ -185,6 +185,7 @@ class Trader:
     def do_transition(self, source, target):
         price = self.exchange.get_ntl_min_price(source) + 1
         source_cost = price
+        assert price > 0
 
         if self.assets[source] < source_cost:
             print(
@@ -218,7 +219,6 @@ class Trader:
         )
         num_target_got = self.exchange.redeem(
             self.assets[NTL],
-            # self.assets[NTL] * 0.01,
             target,
             self.name
         )
