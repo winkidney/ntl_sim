@@ -151,7 +151,12 @@ class Trader:
         target_market_price = self.exchange.get_flat_price(target_token_name)
         return target_market_price / source_market_price
 
-    def should_convert2target(self, source_token, target_token, premium_rate=None):
+    def should_convert2target(
+            self,
+            source_token,
+            target_token,
+            premium_rate=None
+    ):
         ntl_relative_price = self.get_ntl_relative_price(
             source_token, target_token, premium_rate=premium_rate
         )
@@ -203,19 +208,19 @@ class Trader:
         return True
 
     def do_redeem(self, source, target):
-        num_target_got = self.exchange.redeem(
-            # self.assets[NTL],
-            self.assets[NTL] * 0.01,
-            target,
-            self.name
-        )
         print(
-            "%s: redeem, you have %s, accounts %s"
+            "%s: redeeming, you have %s, accounts %s"
             % (
                 self.exchange.components['EOS'].cycle,
                 self.assets,
                 self.exchange.components['EOS'].accounts,
             )
+        )
+        num_target_got = self.exchange.redeem(
+            self.assets[NTL],
+            # self.assets[NTL] * 0.01,
+            target,
+            self.name
         )
         if num_target_got is None:
             print(
@@ -244,9 +249,9 @@ def main():
         source=EOS,
         target=USDT,
         assets={
-            EOS: 1000000000000 * 1000,
-            USDT: 1000000000000 * 1000,
-            NTL: 1000000000000 * 1000,
+            EOS:  1000,
+            USDT: 1000,
+            NTL: 0,
         },
         exchange=exchange,
     )
