@@ -14,6 +14,8 @@ OMG = 'OMG'
 USDT = 'USDT'
 NTL = 'NTL'
 
+bot_logger = logging.getLogger('bot-debugger')
+
 
 def read_csv(name, type='5m'):
     return pd.read_csv(
@@ -188,14 +190,14 @@ class Trader:
         assert price > 0
 
         if self.assets[source] < source_cost:
-            print(
+            bot_logger.error(
                 "Source cost is too much, %s, price is %s"
                 % (source_cost, price)
             )
             return False
         ntl_got = self.exchange.buy(source_cost, source, self.name)
         if ntl_got is None:
-            print(
+            bot_logger.error(
                 "You do auction with cycle: %s ntl_got: %s"
                 % (
                     self.exchange.components[self.source].cycle,
@@ -205,11 +207,11 @@ class Trader:
             return False
         self.assets[NTL] += ntl_got
         self.assets[source] -= source_cost
-        print("buy succeed: %s" % self.assets)
+        bot_logger.debug("buy succeed: %s" % self.assets)
         return True
 
     def do_redeem(self, source, target):
-        print(
+        bot_logger.debug(
             "%s: redeeming, you have %s, accounts %s"
             % (
                 self.exchange.components['EOS'].cycle,
@@ -223,7 +225,7 @@ class Trader:
             self.name
         )
         if num_target_got is None:
-            print(
+            bot_logger.error(
                 "%s: Failed to redeem, you have %s, accounts %s"
                 % (
                     self.exchange.components['EOS'].cycle,
@@ -237,14 +239,76 @@ class Trader:
         return True
 
 
-def main():
-    ntl_prices = defaultdict(list)
-    reversed_amounts = defaultdict(list)
-    flat_prices = defaultdict(list)
-    ntl_total_supply_amounts = defaultdict(list)
-    ts = []
+class Statistics:
 
+    def __init__(self):
+        self.ntl_prices = defaultdict(list)
+        self.reversed_amounts = defaultdict(list)
+        self.flat_prices = defaultdict(list)
+        self.ntl_total_supply_amounts = defaultdict(list)
+        self.ts = []
+
+    def record(self, exchange):
+        self.ts.append(exchange.components['EOS'].timestamp)
+        for symbol in exchange.symbols:
+            self.ntl_prices[symbol].append(
+                exchange.components[symbol].min_bid
+            )
+            self.reversed_amounts[symbol].append(
+                exchange.components[symbol].reserve
+            )
+            self.ntl_total_supply_amounts[symbol].append(
+                exchange.components[symbol].total_supply
+            )
+            self.flat_prices[symbol].append(
+                exchange.get_flat_price(symbol)
+            )
+
+    def get_data_frame(self, exchange):
+        data_frames = []
+        for symbol in exchange.symbols:
+            all_data = dict(
+                (
+                    (
+                        'ntl_%s_price' % symbol,
+                        pd.Series(
+                            self.ntl_prices[symbol],
+                            index=self.ts,
+                        )
+                    ),
+                    (
+                        '%s_reserved' % symbol,
+                        pd.Series(
+                            self.reversed_amounts[symbol],
+                            index=self.ts,
+                        )
+                    ),
+                    (
+                        'ntl_total_supply',
+                        pd.Series(
+                            self.ntl_total_supply_amounts[symbol],
+                            index=self.ts,
+                        )
+                    ),
+                    (
+                        '%s_flat_price' % symbol,
+                        pd.Series(
+                            self.flat_prices[symbol],
+                            index=self.ts,
+                        )
+                    ),
+                )
+            )
+            data_frames.append(
+                pd.DataFrame(all_data)
+            )
+        return data_frames
+
+
+
+def run():
     exchange = Exchange(['EOS', 'USDT'])
+    statistic_tool = Statistics()
     trader = Trader(
         source=EOS,
         target=USDT,
@@ -263,48 +327,19 @@ def main():
         try:
             exchange.update_kline()
         except ValueError:
+            bot_logger.info("Has no kline data, exited.")
             break
-        ts.append(exchange.components['EOS'].timestamp)
-        for symbol in exchange.symbols:
-            ntl_prices[symbol].append(
-                exchange.components[symbol].min_bid
-            )
-            reversed_amounts[symbol].append(
-                exchange.components[symbol].reserve
-            )
-            ntl_total_supply_amounts[symbol].append(
-                exchange.components[symbol].total_supply
-            )
-            flat_prices[symbol].append(
-                exchange.get_flat_price(symbol)
-            )
+        statistic_tool.record(exchange)
         if callable(fn):
             fn()
         fn = trader.one_cycle()
+    return statistic_tool.get_data_frame(exchange)
 
-    import pandas as pd
-    dfs = []
-    for symbol in exchange.symbols:
-        all_data = {}
-        all_data['ntl_%s_price' % symbol] = pd.Series(
-            ntl_prices[symbol],
-            index=ts,
-        )
-        all_data['%s_reserved' % symbol] = pd.Series(
-            reversed_amounts[symbol],
-            index=ts,
-        )
-        all_data['ntl_total_supply'] = pd.Series(
-            ntl_total_supply_amounts[symbol],
-            index=ts,
-        )
-        all_data['%s_flat_price' % symbol] = pd.Series(
-            flat_prices[symbol],
-            index=ts,
-        )
-        dfs.append(
-            pd.DataFrame(all_data)
-        )
-    return dfs
 
-dfs = main()
+def main():
+    bot_logger.setLevel(logging.DEBUG)
+    return run()
+
+
+if __name__ == "__main__":
+    main()
