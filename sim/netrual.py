@@ -2,7 +2,7 @@ NLT_accounts = {}
 
 
 class Component:
-    min_bid = 1
+    min_bid = float(1)
     minted = {}
     timestamp = 0
     auction_window = 300
@@ -10,26 +10,22 @@ class Component:
     start_timestamp = -1
     current_cycle = 0
     accounts = NLT_accounts
-    reserve = 0
+    reserve = float(0)
 
     def __init__(self, token):
         self.token = token
 
-    def __call__(self, timestamp: int):
+    def __call__(self, timestamp: float):
         self.timestamp = timestamp
         if self.start_timestamp == -1:
             self.start_timestamp = timestamp
         if self.cycle > self.current_cycle:
-            print('==' * 20)
-            print('%s New cycle %s' % (self.token, self.cycle))
-            print('Current balance %s' % self.accounts)
-            print('Current minted %s' % self.minted)
-            print('==' * 20)
+            print('%s:: New cycle %s' % (self.token, self.cycle))
             self.update_status()
         return self
 
     @property
-    def cycle(self) -> int:
+    def cycle(self) -> float:
         return int((self.timestamp - self.start_timestamp) / self.auction_window)
 
     @property
@@ -79,17 +75,17 @@ class Component:
             self.reserve += self.last_minted['bid']
             self.min_bid = self.last_minted['bid']
 
-    def balance(self, sender) -> int:
+    def balance(self, sender) -> float:
         return self.accounts.get(sender, 0)
 
     @property
-    def total_supply(self) -> int:
+    def total_supply(self) -> float:
         return sum(list(self.accounts.values()))
 
     def verify_bid(self, bid) -> bool:
         return bid > self.min_bid
 
-    def update_auction(self, bid: int, sender: str) -> True:
+    def update_auction(self, bid: float, sender: str) -> True:
         params = dict(
             bid=bid,
             sender=sender
@@ -103,13 +99,13 @@ class Component:
             return True
         return False
 
-    def auction(self, sender: str, bid: int) -> bool:
+    def auction(self, sender: str, bid: float) -> bool:
+        bid = float(bid)
         return self.verify_bid(bid) and self.update_auction(bid, sender)
 
-    def redeem(self, sender: str, quantity: int) -> int:
-        print('==' * 20)
+    def redeem(self, sender: str, quantity: float) -> float:
+        quantity = float(quantity)
         print('Redeeming Current accounts %s, redeem %s for %s' % (self.accounts, quantity, sender))
-
         assert self.cycle > 0
         redeemed = self.reserve / self.total_supply * quantity
         if not redeemed <= self.reserve:
@@ -121,8 +117,7 @@ class Component:
             print('Failed on Burning')
             return False
         if burned:
-            self.min_bid = self.min_bid - quantity
+            self.min_bid = self.min_bid * (1 - float(quantity) / self.reserve)
             self.reserve -= redeemed
             print('Redeem Finished Current accounts %s' % self.accounts)
-            print('==' * 20)
             return redeemed
