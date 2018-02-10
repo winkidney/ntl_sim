@@ -338,7 +338,8 @@ def run():
 
 def main():
     bot_logger.setLevel(logging.DEBUG)
-    return run()
+    result = run()
+    return result
 
 
 if __name__ == "__main__":

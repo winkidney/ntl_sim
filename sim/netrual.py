@@ -112,6 +112,7 @@ class Component:
 
         assert self.cycle > 0
         redeemed = self.reserve / self.total_supply * quantity
+        redeemed_percentage = redeemed / float(self.reserve)
         if not redeemed <= self.reserve:
             print('Redeem request is less than reserve')
             return False
@@ -121,7 +122,7 @@ class Component:
             print('Failed on Burning')
             return False
         if burned:
-            self.min_bid = self.min_bid - quantity
+            self.min_bid = (self.min_bid * redeemed_percentage)
             self.reserve -= redeemed
             print('Redeem Finished Current accounts %s' % self.accounts)
             print('==' * 20)
