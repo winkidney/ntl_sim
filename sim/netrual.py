@@ -1,13 +1,13 @@
 NLT_accounts = {}
 NLT_reserve = {}
 NLT_components = {}
+NLT_AUCTION_WINDOW = 3600
 
 
 class Component:
     min_bid = float(1)
-    minted = {}
     timestamp = 0
-    auction_window = 300
+    auction_window = NLT_AUCTION_WINDOW
     last_cycle = -1
     start_timestamp = -1
     current_cycle = 0
@@ -15,9 +15,10 @@ class Component:
     components = NLT_components
 
     def __init__(self, token):
+        self.minted = {}
         NLT_reserve[token] = float(0)
         self.token = token
-        self.reserve = NLT_reserve[token]
+        self.reserves = NLT_reserve
         self.components[token] = self
 
     def __call__(self, timestamp: float):
@@ -28,6 +29,17 @@ class Component:
             print('%s:: New cycle %s' % (self.token, self.cycle))
             self.update_status()
         return self
+
+    def __repr__(self):
+        return '%s %s => %s NTL' % (self.reserve, self.token, self.total_supply)
+
+    @property
+    def reserve(self):
+        return self.reserves[self.token]
+
+    @reserve.setter
+    def reserve(self, v):
+        self.reserves[self.token] = v
 
     @property
     def cycle(self) -> float:
@@ -77,7 +89,7 @@ class Component:
         if self.last_minted:
             print('Found last Winner')
             self.send_token(self.last_minted['sender'], 1000)
-            self.reserve += self.last_minted['bid']
+            self.reserve = self.reserve + self.last_minted['bid']
             self.min_bid = self.last_minted['bid']
 
     def balance(self, sender) -> float:
