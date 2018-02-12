@@ -1,4 +1,6 @@
 NLT_accounts = {}
+NLT_reserve = {}
+NLT_components = {}
 
 
 class Component:
@@ -10,10 +12,13 @@ class Component:
     start_timestamp = -1
     current_cycle = 0
     accounts = NLT_accounts
-    reserve = float(0)
+    components = NLT_components
 
     def __init__(self, token):
+        NLT_reserve[token] = float(0)
         self.token = token
+        self.reserve = NLT_reserve[token]
+        self.components[token] = self
 
     def __call__(self, timestamp: float):
         self.timestamp = timestamp
