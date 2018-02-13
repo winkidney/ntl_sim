@@ -49,6 +49,13 @@ class Component:
     def last_minted(self):
         return self.minted.get(self.last_cycle)
 
+    def get_redeem_rate(self, quantity):
+        if quantity <= 1000:
+            return self.min_bid / 1000
+        else:
+            times = int(quantity / 1000)
+            return sum([v['bid'] for v in self.minted.values()][-times:]) / (times * 1000)
+
     def get_cycle(self, winner: str) -> list:
         return [
             c
@@ -120,12 +127,15 @@ class Component:
         bid = float(bid)
         return self.verify_bid(bid) and self.update_auction(bid, sender)
 
+    def redeem_all(self, sender) -> float:
+        return self.redeem(sender, self.balance(sender))
+
     def redeem(self, sender: str, quantity: float) -> float:
         quantity = float(quantity)
         print('Redeeming Current accounts %s, redeem %s for %s' % (self.accounts, quantity, sender))
         assert self.cycle > 0
-        redeemed = self.reserve / self.total_supply * quantity
-        redeemed_percentage = redeemed / float(self.reserve)
+
+        redeemed = self.get_redeem_rate(quantity) * quantity
         if not redeemed <= self.reserve:
             print('Redeem request is less than reserve')
             return False
@@ -135,7 +145,9 @@ class Component:
             print('Failed on Burning')
             return False
         if burned:
-            self.min_bid = (self.min_bid * redeemed_percentage)
+            redeemed_percentage = quantity % 1000 / float(self.reserve)
+            self.min_bid = [v['bid'] for v in self.minted.values()][int(-(quantity / 1000) + 1)]
+            self.min_bid = (self.min_bid * (1 - redeemed_percentage))
             self.reserve -= redeemed
             print('Redeem Finished Current accounts %s' % self.accounts)
             return redeemed

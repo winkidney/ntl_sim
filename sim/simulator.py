@@ -1,6 +1,5 @@
 import random
 from pandas import DataFrame
-import time
 
 from .netrual import Component, NLT_reserve, NLT_components  # noqa
 from .utils import redeem_strategy, auction_strategy, nlt_price
@@ -16,6 +15,13 @@ def warmup(start_timestamp, sender):
         print(res)
 
 
+def rational_warmup(start_timestamp, market_price, sender):
+    begin = start_timestamp - Component.auction_window - 1
+    for c in NLT_components.values():
+        res = c(begin).auction(sender, 1 / float(market_price[c.token]) * 1000)
+        print(res)
+
+
 def sim_loop(market_prices: DataFrame, sender='satoshi'):
     '''
     [{token: price}]
@@ -24,27 +30,36 @@ def sim_loop(market_prices: DataFrame, sender='satoshi'):
     tokens = [t for t in market_prices.columns if t != 'timestamp']
     [Component(t) for t in tokens]  # inital
     warmup(market_prices.timestamp[0], sender)
+    rational_warmup(market_prices.timestamp[0], market_prices.T[0], 'satoshi')
+    old_cycle = -1
 
     for i, data in market_prices.iterrows():
-        print('==' * 20)
-        print(dict(data))
-        print('PRICE OF NLT %s' % nlt_price(data))
+        print("==" * 10)
         ts = data['timestamp']
+
         [c(ts) for c in NLT_components.values()]
         market_price = {k: v for k, v in data.items() if k != 'timestamp'}
+        price = nlt_price(market_price)
+        print('PRICE OF NLT %s' % price)
+        import time
+        time.sleep(0.01)
 
-        ret.append({
-            'ts': ts,
-            'price': nlt_price(market_price)
-        })
-        print(ts, nlt_price(market_price))
+        curr_cycle = list(NLT_components.values())[0].cycle
+        #  Only do auction when get a new cycle
+        if old_cycle != -1 and curr_cycle != old_cycle:
+            plan_to_auction = determin_auction_quantity(market_price)
+            auctioned = auction_strategy(plan_to_auction, sender, ts)
+            print('plan to auctioon %s' % plan_to_auction)
+            print('Auctioned %s' % auctioned)
+        old_cycle = curr_cycle
 
-        plan_to_auction = determin_auction_quantity(market_price)
         plan_to_redeem = determin_redeem_quantity(market_price)
-        print('plan to aucthon %s, plan to redeem %s ' % (plan_to_auction, plan_to_redeem))
-        time.sleep(0.001)
+        print('plan to redeem %s for' % plan_to_redeem)
+
         redeemed = redeem_strategy(plan_to_redeem, sender, ts)
-        auctioned = auction_strategy(plan_to_auction, sender, ts)
-        print(redeemed)
-        print(auctioned)
+        print('Redeemed %s' % redeemed)
+        ret.append(dict({
+            'ts': ts,
+            'price': price
+        }, **NLT_reserve))
     return ret

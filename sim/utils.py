@@ -1,51 +1,55 @@
-from .netrual import NLT_reserve, NLT_components, NLT_accounts, NLT_AUCTION_WINDOW
+import operator
+from .netrual import NLT_reserve, NLT_components, NLT_accounts
 
 
 def highest(market_prices: dict):
+
     return max({
-        t: NLT_reserve[t] * float(p)
+        #        t: NLT_reserve[t] * float(p)
+        #        t: float(p)
+        t: float(p) * NLT_components[t].min_bid
+
         for t, p in market_prices.items()
         if t != 'timestamp'
-    })
+    }.items(), key=operator.itemgetter(1))[0]
 
 
 def lowest(market_prices: dict):
     return min({
-        t: NLT_reserve[t] * float(p)
+        t: float(p) * NLT_components[t].min_bid
+        # t: NLT_reserve[t] * float(p)
         for t, p in market_prices.items()
         if t != 'timestamp'
-    })
+    }.items(), key=operator.itemgetter(1))[0]
 
 
 def nlt_value(market_prices: dict):
     h = highest(market_prices)
-    if NLT_components[h].total_supply == 0:
-        return 0
     return (market_prices[h] * NLT_reserve[h])
 
 
 def nlt_price(market_price: dict):
-    total_supply = list(NLT_components.values())[0].total_supply
-    if total_supply == 0:
-        return 0
-    return nlt_value(market_price) / total_supply
+    h = highest(market_price)
+    return (market_price[h] * NLT_components[h].min_bid) / 1000
+    # total_supply = list(NLT_components.values())[0].total_supply
+    # return nlt_value(market_price) / total_supply
 
 
 def get_worth_to_auction(market_price: dict):
-    return {
-        k: v for k, v in market_price.items() if v < nlt_price(market_price)
-    }
-
-
-def get_worth_to_redeem(market_price: dict):
     return {
         k: v for k, v in market_price.items() if v > nlt_price(market_price)
     }
 
 
+def get_worth_to_redeem(market_price: dict):
+    return {
+        k: v for k, v in market_price.items() if v < nlt_price(market_price)
+    }
+
+
 def determin_auction_quantity(market_price: dict):
     planned = {
-        k: nlt_price(market_price) * NLT_AUCTION_WINDOW / v
+        k: nlt_price(market_price) * 1000 / v
         for k, v
         in get_worth_to_auction(market_price).items()
     }
@@ -58,10 +62,23 @@ def determin_auction_quantity(market_price: dict):
 
 
 def determin_redeem_quantity(market_price: dict):
-    return {
-        k: nlt_price(market_price) / NLT_AUCTION_WINDOW / v
+    # redeemed = self.reserve / self.total_supply * quantity
+
+    def quantity(token, t_price, n_price):
+        q = 0
+        while NLT_components[token].get_redeem_rate(q) * t_price > n_price:
+            q += 1000
+        return q
+    planned = {
+        k: quantity(k, v, nlt_price(market_price))
         for k, v
         in get_worth_to_auction(market_price).items()
+    }
+
+    return {
+        k: v
+        for k, v in planned.items()
+        if v != 0
     }
 
 

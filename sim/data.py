@@ -11,12 +11,19 @@ def read_csv(name, type='5m'):
 def get_price(token, eth_usdt=None):  # None for cache able
     if not eth_usdt:
         eth_usdt = read_csv('ETH_USDT')
-    eth_target = read_csv('%s_ETH' % token)
-    merged = pd.merge(eth_target, eth_usdt, on='timestamp')
+
+    if token == 'ETH':
+        value = eth_usdt['last']
+        timestamp = eth_usdt['timestamp']
+    else:
+        eth_target = read_csv('%s_ETH' % token)
+        merged = pd.merge(eth_target, eth_usdt, on='timestamp')
+        value = merged['last_x'] * merged['last_y']
+        timestamp = eth_usdt['timestamp']
+
     return pd.DataFrame({
-        token: merged['last_x'] * merged['last_y'],
-        'timestamp': merged['timestamp']
-#        'timestamp': pd.to_datetime(merged['timestamp'], unit='s')
+        token: value,
+        'timestamp': timestamp
     })
 
 
