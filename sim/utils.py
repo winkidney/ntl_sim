@@ -3,7 +3,6 @@ from .netrual import NLT_reserve, NLT_components, NLT_accounts
 
 
 def highest(market_prices: dict):
-
     return max({
         #        t: NLT_reserve[t] * float(p)
         #        t: float(p)
@@ -23,8 +22,10 @@ def lowest(market_prices: dict):
     }.items(), key=operator.itemgetter(1))[0]
 
 
-def nlt_price_2(market_prices: dict):
-    return sum(NLT_reserve.values()) / NLT_components['EOS'].total_supply
+def nlt_price_2(market_price: dict):
+    if NLT_components['EOS'].total_supply == 0:
+        return nlt_price(market_price) * 10
+    return sum([market_price[t] * v for t, v in NLT_reserve.items()]) / NLT_components['EOS'].total_supply
 
     # h = highest(market_prices)
     # return (market_prices[h] * NLT_reserve[h])
