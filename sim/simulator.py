@@ -2,8 +2,8 @@ import random
 from pandas import DataFrame
 
 from .netrual import Component, NLT_reserve, NLT_components  # noqa
-from .utils import redeem_strategy, auction_strategy, nlt_price
-from .utils import determin_auction_quantity, determin_redeem_quantity
+from .utils import redeem_strategy, auction_strategy, nlt_price, nlt_price_2
+from .utils import determin_auction_quantity, determin_redeem_quantity, get_worth_to_redeem
 
 
 def warmup(start_timestamp, sender):
@@ -39,8 +39,11 @@ def sim_loop(market_prices: DataFrame, sender='satoshi'):
         market_price = {k: v for k, v in data.items() if k != 'timestamp'}
         price = nlt_price(market_price)
         print('PRICE OF NLT %s' % price)
-        # import time
-        # time.sleep(0.01)
+        plan_to_redeem = determin_redeem_quantity(market_price)
+        print('plan to redeem %s for' % plan_to_redeem)
+
+        redeemed = redeem_strategy(plan_to_redeem, sender, ts)
+        print('Redeemed %s' % redeemed)
 
         curr_cycle = list(NLT_components.values())[0].cycle
         #  Only do auction when get a new cycle
@@ -49,17 +52,12 @@ def sim_loop(market_prices: DataFrame, sender='satoshi'):
                 return ret
             plan_to_auction = determin_auction_quantity(market_price)
             auctioned = auction_strategy(plan_to_auction, sender, ts)
-            print('plan to auctioon %s' % plan_to_auction)
+            print('plan to auction %s' % plan_to_auction)
             print('Auctioned %s' % auctioned)
         old_cycle = curr_cycle
-
-        plan_to_redeem = determin_redeem_quantity(market_price)
-        print('plan to redeem %s for' % plan_to_redeem)
-
-        redeemed = redeem_strategy(plan_to_redeem, sender, ts)
-        print('Redeemed %s' % redeemed)
         ret.append(dict({
             'ts': ts,
-            'price': price
+            'price': price,
+            'price2': nlt_price_2(market_price)
         }, **NLT_reserve))
     return ret

@@ -23,9 +23,11 @@ def lowest(market_prices: dict):
     }.items(), key=operator.itemgetter(1))[0]
 
 
-def nlt_value(market_prices: dict):
-    h = highest(market_prices)
-    return (market_prices[h] * NLT_reserve[h])
+def nlt_price_2(market_prices: dict):
+    return sum(NLT_reserve.values()) / NLT_components['EOS'].total_supply
+
+    # h = highest(market_prices)
+    # return (market_prices[h] * NLT_reserve[h])
 
 
 def nlt_price(market_price: dict):
