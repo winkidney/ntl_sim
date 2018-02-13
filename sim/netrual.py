@@ -51,10 +51,11 @@ class Component:
 
     def get_redeem_rate(self, quantity):
         if quantity <= 1000:
-            return self.min_bid / 1000
+            price = self.min_bid / 1000
         else:
             times = int(quantity / 1000)
-            return sum([v['bid'] for v in self.minted.values()][-times:]) / (times * 1000)
+            price = sum([v['bid'] for v in self.minted.values()][-times:]) / (times * 1000)
+        return price
 
     def get_cycle(self, winner: str) -> list:
         return [
@@ -107,7 +108,7 @@ class Component:
         return sum(list(self.accounts.values()))
 
     def verify_bid(self, bid) -> bool:
-        return bid > self.min_bid
+        return bid >= self.min_bid
 
     def update_auction(self, bid: float, sender: str) -> True:
         params = dict(
@@ -125,7 +126,8 @@ class Component:
 
     def auction(self, sender: str, bid: float) -> bool:
         bid = float(bid)
-        return self.verify_bid(bid) and self.update_auction(bid, sender)
+        ret = self.verify_bid(bid) and self.update_auction(bid, sender)
+        return ret
 
     def redeem_all(self, sender) -> float:
         return self.redeem(sender, self.balance(sender))
@@ -136,18 +138,22 @@ class Component:
         assert self.cycle > 0
 
         redeemed = self.get_redeem_rate(quantity) * quantity
-        if not redeemed <= self.reserve:
-            print('Redeem request is less than reserve')
-            return False
-
         burned = self.burn_token(sender, quantity)
         if not burned:
             print('Failed on Burning')
             return False
         if burned:
-            redeemed_percentage = quantity % 1000 / float(self.reserve)
-            self.min_bid = [v['bid'] for v in self.minted.values()][int(-(quantity / 1000) + 1)]
-            self.min_bid = (self.min_bid * (1 - redeemed_percentage))
+
+            if not redeemed > self.reserve:
+                redeemed = self.reserve
+                self.reserve = 0
+                self.min_bid = 1
+                return redeemed
+
+            next_min_bid = [v['bid'] for v in self.minted.values()][:int(-(quantity / 1000) + 1)] or [1]
+            redeemed_percentage = quantity % 1000 / float(self.min_bid)
+            self.min_bid = (next_min_bid[0] * (1 - redeemed_percentage))
             self.reserve -= redeemed
-            print('Redeem Finished Current accounts %s' % self.accounts)
+            if self.reserve < 0:
+                self.reserve = 0
             return redeemed

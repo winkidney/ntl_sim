@@ -37,13 +37,13 @@ def nlt_price(market_price: dict):
 
 def get_worth_to_auction(market_price: dict):
     return {
-        k: v for k, v in market_price.items() if v > nlt_price(market_price)
+        k: v for k, v in market_price.items() if v * NLT_components[k].min_bid / 1000 < nlt_price(market_price)
     }
 
 
 def get_worth_to_redeem(market_price: dict):
     return {
-        k: v for k, v in market_price.items() if v < nlt_price(market_price)
+        k: v for k, v in market_price.items() if v * NLT_components[k].min_bid / 1000 > nlt_price(market_price)
     }
 
 
