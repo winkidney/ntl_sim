@@ -25,7 +25,7 @@ def lowest(market_prices: dict):
 def nlt_price_2(market_price: dict):
     if NLT_components['EOS'].total_supply == 0:
         return nlt_price(market_price) * 10
-    return sum([market_price[t] * v for t, v in NLT_reserve.items()]) / 8000
+    return sum([market_price[t] * v for t, v in NLT_reserve.items()]) / float(len(NLT_components) * 1000)
 
     # h = highest(market_prices)
     # return (market_prices[h] * NLT_reserve[h])
