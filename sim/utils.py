@@ -38,15 +38,25 @@ def nlt_price(market_price: dict):
     # return nlt_value(market_price) / total_supply
 
 
-def get_worth_to_auction(market_price: dict):
+def get_worth_to_auction(market_price: dict, price_model=nlt_price):
+    price = price_model(market_price)
     return {
-        k: v for k, v in market_price.items() if v * NLT_components[k].min_bid / 1000 < nlt_price(market_price)
+        k: {
+            'price': v,
+            'min_bid': NLT_components[k].min_bid,
+            'delta': v * NLT_components[k].min_bid / 1000 - price
+        } for k, v in market_price.items() if round(v * NLT_components[k].min_bid / 1000) < round(price)
     }
 
 
-def get_worth_to_redeem(market_price: dict):
+def get_worth_to_redeem(market_price: dict, price_model=nlt_price):
+    price = price_model(market_price)
     return {
-        k: v for k, v in market_price.items() if v * NLT_components[k].min_bid / 1000 > nlt_price_2(market_price)
+        k: {
+            'price': v,
+            'min_bid': NLT_components[k].min_bid,
+            'delta': v * NLT_components[k].min_bid / 1000 - price
+        } for k, v in market_price.items() if round(v * NLT_components[k].min_bid / 1000) > round(price)
     }
 
 
