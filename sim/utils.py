@@ -38,25 +38,41 @@ def nlt_price(market_price: dict):
     # return nlt_value(market_price) / total_supply
 
 
-def get_worth_to_auction(market_price: dict, price_model=nlt_price):
+def auction_threshold(p_c, p_nlt, min_bid):
+    value_c = min_bid * p_c
+    value_nlt = p_nlt * 1000
+    return float(value_nlt) / float(value_c) > 1.01
+
+
+def redeem_threshold(p_c, p_nlt, min_bid):
+    value_c = min_bid * p_c
+    value_nlt = p_nlt * 1000
+    return float(value_c) / float(value_nlt) > 1.01
+
+
+def get_worth_to_auction(market_price: dict, price_model=nlt_price, threshold_func=auction_threshold):
     price = price_model(market_price)
     return {
         k: {
             'price': v,
             'min_bid': NLT_components[k].min_bid,
             'delta': v * NLT_components[k].min_bid / 1000 - price
-        } for k, v in market_price.items() if round(v * NLT_components[k].min_bid / 1000) < round(price)
+        }
+        for k, v in market_price.items()
+        if threshold_func(v, price, NLT_components[k].min_bid)
     }
 
 
-def get_worth_to_redeem(market_price: dict, price_model=nlt_price):
+def get_worth_to_redeem(market_price: dict, price_model=nlt_price, threshold_func=redeem_threshold):
     price = price_model(market_price)
     return {
         k: {
             'price': v,
             'min_bid': NLT_components[k].min_bid,
             'delta': v * NLT_components[k].min_bid / 1000 - price
-        } for k, v in market_price.items() if round(v * NLT_components[k].min_bid / 1000) > round(price)
+        }
+        for k, v in market_price.items()
+        if threshold_func(v, price, NLT_components[k].min_bid)
     }
 
 
