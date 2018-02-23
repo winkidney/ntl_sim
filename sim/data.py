@@ -24,7 +24,7 @@ def get_price(token, eth_usdt=None):  # None for cache able
     return pd.DataFrame({
         token: value,
         'timestamp': timestamp
-    })
+    }).dropna(how='any')
 
 
 def get_batch_price(tokens, eth_usdt=None):
@@ -32,4 +32,4 @@ def get_batch_price(tokens, eth_usdt=None):
         [get_price(t) for t in tokens], axis=1
     )
     # https://stackoverflow.com/questions/32041245/fast-method-for-removing-duplicate-columns-in-pandas-dataframe
-    return df.loc[:, ~df.columns.duplicated()]
+    return df.loc[:, ~df.columns.duplicated()].dropna(how='any')
