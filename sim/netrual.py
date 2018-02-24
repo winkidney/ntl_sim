@@ -49,13 +49,9 @@ class Component:
     def last_minted(self):
         return self.minted.get(self.last_cycle)
 
-    def get_redeem_rate(self, quantity):
-        if quantity <= 1000:
-            price = self.min_bid / 1000
-        else:
-            times = int(quantity / 1000)
-            price = sum([v['bid'] for v in self.minted.values()][-times:]) / (times * 1000)
-        return price
+    def get_redeem_amount(self, quantity):
+        assert quantity % 1000 == 0
+        return sum([v['bid'] for v in self.minted.values()][-(int(quantity / 1000)):])
 
     def get_cycle(self, winner: str) -> list:
         return [
@@ -132,28 +128,17 @@ class Component:
     def redeem_all(self, sender) -> float:
         return self.redeem(sender, self.balance(sender))
 
-    def redeem(self, sender: str, quantity: float) -> float:
-        quantity = float(quantity)
-        print('Redeeming Current accounts %s, redeem %s for %s' % (self.accounts, quantity, sender))
-        assert self.cycle > 0
-
-        redeemed = self.get_redeem_rate(quantity) * quantity
-        burned = self.burn_token(sender, quantity)
-        if not burned:
-            print('Failed on Burning')
-            return False
-        if burned:
-
-            if not redeemed > self.reserve:
-                redeemed = self.reserve
-                self.reserve = 0
-                self.min_bid = 1
-                return redeemed
-
-            next_min_bid = [v['bid'] for v in self.minted.values()][:int(-(quantity / 1000) + 1)] or [1]
-            redeemed_percentage = quantity % 1000 / float(self.min_bid)
-            self.min_bid = (next_min_bid[0] * (1 - redeemed_percentage))
-            self.reserve -= redeemed
-            if self.reserve < 0:
-                self.reserve = 0
+    def redeem_1000(self, sender):
+        redeemed = self.min_bid
+        assert self.redeemed > self.reserve
+        if self.burn_token(sender, 1000):
+            self.min_bid = list(self.minted.values())[-2]['bid']
+            del self.minted[list(self.minted.keys())[-1]]
             return redeemed
+        else:
+            raise Exception('out of balance')
+
+    def redeem(self, sender: str, quantity: float) -> float:
+        assert quantity % 1000 == 0
+        for _ in range(0, quantity / 1000):
+            yield self.redeem_1000(sender)
