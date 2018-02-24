@@ -11,15 +11,16 @@ class Component:
     last_cycle = -1
     start_timestamp = -1
     current_cycle = 0
-    accounts = NLT_accounts
-    components = NLT_components
 
-    def __init__(self, token):
+    def __init__(self, token, inital_reserve=10000):
         self.minted = {}
         NLT_reserve[token] = float(0)
         self.token = token
         self.reserves = NLT_reserve
+        self.components = NLT_components
         self.components[token] = self
+        self.accounts = NLT_accounts
+        self.reserves[self.token] = inital_reserve
 
     def __call__(self, timestamp: float):
         self.timestamp = timestamp
@@ -129,16 +130,21 @@ class Component:
         return self.redeem(sender, self.balance(sender))
 
     def redeem_1000(self, sender):
+        print('redeeming 1000 for %s, reserve is %s' % (self.token, self.reserve))
         redeemed = self.min_bid
-        assert self.redeemed > self.reserve
+        assert redeemed <= self.reserve
+        self.reserve = self.reserve - redeemed
         if self.burn_token(sender, 1000):
-            self.min_bid = list(self.minted.values())[-2]['bid']
+            if len(self.minted) > 1:
+                self.min_bid = list(self.minted.values())[-2]['bid']
+            else:
+                self.min_bid = 1  # set to the inital value
             del self.minted[list(self.minted.keys())[-1]]
             return redeemed
         else:
-            raise Exception('out of balance')
+            raise Exception('out of balance', self.balance(sender))
 
     def redeem(self, sender: str, quantity: float) -> float:
         assert quantity % 1000 == 0
-        for _ in range(0, quantity / 1000):
+        for _ in range(0, int(quantity / 1000)):
             yield self.redeem_1000(sender)

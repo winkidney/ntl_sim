@@ -38,9 +38,8 @@ def exchange(market_prices, ts, sender):
 
 
 def nlt_price_2(market_price: dict):
-    if NLT_components['EOS'].total_supply == 0:
-        return nlt_price(market_price) * 10
-    return sum([market_price[t] * v for t, v in NLT_reserve.items()]) / float(len(NLT_components) * 1000)
+    minted = {t: c.min_bid for t, c in NLT_components.items()}
+    return sum([market_price[t] * v for t, v in minted.items()]) / float(len(NLT_components) * 1000)
 
     # h = highest(market_prices)
     # return (market_prices[h] * NLT_reserve[h])
@@ -117,7 +116,7 @@ def determin_redeem_quantity(market_price: dict, price_model=nlt_price):
 
     def quantity(token, t_price, n_price):
         q = 1000
-        while NLT_components[token].get_redeem_amount(q) * t_price > n_price * q:
+        while (NLT_components[token].get_redeem_amount(q + 1000) * t_price) / (n_price * (q + 1000)) > 1.0001:
             q += 1000
         return q
 
@@ -149,13 +148,13 @@ def redeem(token, market_price, sender, rate=0.002):
 
 def redeem_strategy(plan: dict, sender: str, ts: int):
     return {
-        'redeemed': NLT_components[t](ts).redeem(sender, q)
+        'redeemed %s' % t: list(NLT_components[t](ts).redeem(sender, q))
         for t, q in plan.items()
     }
 
 
 def auction_strategy(plan: dict, sender: str, ts: int):
     return {
-        'auctioned': NLT_components[t](ts).auction(sender, bid)
+        'auctioned %s' % t: NLT_components[t](ts).auction(sender, bid)
         for t, bid in plan.items()
     }
