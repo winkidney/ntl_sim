@@ -5,7 +5,7 @@ from decimal import Decimal
 import pandas as pd
 
 from sim.netrual import Component
-from utils import should_convert2target
+from trader.utils import should_convert2target
 
 
 EOS = 'EOS'
@@ -98,15 +98,18 @@ class Exchange:
         component = self.components[token_name]
         return Decimal(component.min_bid)
 
-    def redeem(self, num_ntl, symbol, sender_name):
+    def redeem(self, symbol, sender_name):
         """
         return token.
         """
         component = self.components[symbol]
-        num_redeemed = component.redeem(sender_name, num_ntl)
+        _redeemed = component.redeem_all(sender_name)
+        num_redeemed = Decimal('0')
+        for redeemed in _redeemed:
+            num_redeemed += Decimal(redeemed)
         if num_redeemed is False:
             return None
-        return Decimal(num_redeemed)
+        return num_redeemed
 
     def buy(self, num_token, symbol, sender_name):
         """
@@ -144,7 +147,7 @@ class Trader:
 
     @staticmethod
     def get_price_with_impact_cost(min_price, premium_rate):
-        return min_price * (1 + premium_rate)
+        return min_price * (1 + premium_rate or 0)
 
     @staticmethod
     def get_premium_rate():
@@ -168,7 +171,7 @@ class Trader:
             target_ntl_price,
             premium_rate=premium_rate,
         ):
-            if self.do_transition(self.source, self.target):
+            if self.do_transition(self.source, self.target, premium_rate):
                 return lambda : self.do_redeem(self.source, self.target)
         if should_convert2target(
             source_market_price,
@@ -177,11 +180,12 @@ class Trader:
             target_ntl_price,
             premium_rate=premium_rate,
         ):
-            if self.do_transition(self.target, self.source):
+            if self.do_transition(self.target, self.source, premium_rate):
                 return lambda: self.do_redeem(self.target, self.source)
 
-    def do_transition(self, source, target):
-        price = self.exchange.get_ntl_min_price(source) + 1
+    def do_transition(self, source, target, premium_rate):
+        price = self.exchange.get_ntl_min_price(source)
+        price = self.get_price_with_impact_cost(price, premium_rate)
         source_cost = price
         assert price > 0
 
@@ -216,7 +220,6 @@ class Trader:
             )
         )
         num_target_got = self.exchange.redeem(
-            self.assets[NTL],
             target,
             self.name
         )
@@ -230,7 +233,7 @@ class Trader:
                 )
             )
             return False
-        self.assets[NTL] = 0
+        self.assets[NTL] = Decimal("0")
         self.assets[target] += num_target_got
         return True
 
@@ -289,7 +292,7 @@ class Statistics:
                     (
                         '%s_flat_price' % symbol,
                         pd.Series(
-                            self.flat_prices[symbol],
+                            [float(price) for price in self.flat_prices[symbol]],
                             index=self.ts,
                         )
                     ),

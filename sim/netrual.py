@@ -1,7 +1,7 @@
 NLT_accounts = {}
 NLT_reserve = {}
 NLT_components = {}
-NLT_AUCTION_WINDOW = 3600
+NLT_AUCTION_WINDOW = 360
 
 
 class Component:
@@ -135,11 +135,12 @@ class Component:
         assert redeemed <= self.reserve
         self.reserve = self.reserve - redeemed
         if self.burn_token(sender, 1000):
+            keys = list(self.minted.keys())
             if len(self.minted) > 1:
                 self.min_bid = list(self.minted.values())[-2]['bid']
+                del self.minted[keys[-1]]
             else:
                 self.min_bid = 1  # set to the inital value
-            del self.minted[list(self.minted.keys())[-1]]
             return redeemed
         else:
             raise Exception('out of balance', self.balance(sender))

@@ -35,6 +35,7 @@ def should_convert2target(
 
     ntl_relative_price > flat_relative_price ==> we should not redeem eos to get omg
     """
+    premium_rate = premium_rate or 0
     ntl_relative_price = _get_ntl_relative_price(
         source_token_quantity4ntl, target_token_quantity4ntl, premium_rate=premium_rate
     )
