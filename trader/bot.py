@@ -1,12 +1,11 @@
 from collections import defaultdict
 import logging
 
-import random
-
+from decimal import Decimal
 import pandas as pd
-import time
 
 from sim.netrual import Component
+from utils import should_convert2target
 
 
 EOS = 'EOS'
@@ -14,7 +13,22 @@ OMG = 'OMG'
 USDT = 'USDT'
 NTL = 'NTL'
 
-bot_logger = logging.getLogger('bot-debugger')
+
+class BotLogger:
+    @classmethod
+    def debug(cls, *args):
+        return logging.debug(*args)
+
+    @classmethod
+    def error(cls, *args):
+        return logging.error(*args)
+
+    @classmethod
+    def info(cls, *args):
+        return logging.info(*args)
+
+
+bot_logger = BotLogger()
 
 
 def read_csv(name, type='5m'):
@@ -33,7 +47,7 @@ def get_usdt_price_pandas(target_symbol):
 
 
 class Exchange:
-    num_ntl_each_round = 1000
+    num_ntl_each_round = Decimal('1000')
 
     def __init__(self, symbols):
         """
@@ -75,14 +89,14 @@ class Exchange:
     def bootstrap(self):
         self.update_kline()
         for component in self.components.values():
-            component.auction('the-god', 2)
+            component.auction('the-god', Decimal('2'))
 
     def get_flat_price(self, symbol):
-        return self.current_prices[symbol]
+        return Decimal(self.current_prices[symbol])
 
     def get_ntl_min_price(self, token_name):
         component = self.components[token_name]
-        return component.min_bid
+        return Decimal(component.min_bid)
 
     def redeem(self, num_ntl, symbol, sender_name):
         """
@@ -92,7 +106,7 @@ class Exchange:
         num_redeemed = component.redeem(sender_name, num_ntl)
         if num_redeemed is False:
             return None
-        return num_redeemed
+        return Decimal(num_redeemed)
 
     def buy(self, num_token, symbol, sender_name):
         """
@@ -135,51 +149,33 @@ class Trader:
     @staticmethod
     def get_premium_rate():
         # return random.randint(1, 20) / 100.0
-        return 0.02
-
-    def get_ntl_relative_price(
-            self, source_token_name, target_token_name, premium_rate=None
-    ):
-        source_ntl_price = self.exchange.get_ntl_min_price(source_token_name)
-        target_ntl_price = self.exchange.get_ntl_min_price(target_token_name)
-        if premium_rate is not None:
-            target_ntl_price = self.get_price_with_impact_cost(
-                target_ntl_price, premium_rate=premium_rate
-            )
-        return target_ntl_price / source_ntl_price
-
-    def get_token_relative_price(self, source_token_name, target_token_name):
-        source_market_price = self.exchange.get_flat_price(source_token_name)
-        target_market_price = self.exchange.get_flat_price(target_token_name)
-        return target_market_price / source_market_price
-
-    def should_convert2target(
-            self,
-            source_token,
-            target_token,
-            premium_rate=None
-    ):
-        ntl_relative_price = self.get_ntl_relative_price(
-            source_token, target_token, premium_rate=premium_rate
-        )
-        flat_relative_price = self.get_token_relative_price(source_token, target_token)
-
-        if ntl_relative_price < flat_relative_price:
-            return True
-        return False
+        return 0.01
 
     def one_cycle(self):
         """
         Should be run each round.
         """
-        premium_rate = self.get_premium_rate()
-        if self.should_convert2target(
-            self.source, self.target, premium_rate=premium_rate
+        source_ntl_price = self.exchange.get_ntl_min_price(self.source)
+        target_ntl_price = self.exchange.get_ntl_min_price(self.target)
+        source_market_price = self.exchange.get_flat_price(self.source)
+        target_market_price = self.exchange.get_flat_price(self.target)
+
+        premium_rate = Decimal(str(self.get_premium_rate()))
+        if should_convert2target(
+            source_market_price,
+            source_ntl_price,
+            target_market_price,
+            target_ntl_price,
+            premium_rate=premium_rate,
         ):
             if self.do_transition(self.source, self.target):
                 return lambda : self.do_redeem(self.source, self.target)
-        if self.should_convert2target(
-            self.target, self.source, premium_rate=premium_rate
+        if should_convert2target(
+            source_market_price,
+            source_ntl_price,
+            target_market_price,
+            target_ntl_price,
+            premium_rate=premium_rate,
         ):
             if self.do_transition(self.target, self.source):
                 return lambda: self.do_redeem(self.target, self.source)
@@ -214,9 +210,9 @@ class Trader:
         bot_logger.debug(
             "%s: redeeming, you have %s, accounts %s"
             % (
-                self.exchange.components['EOS'].cycle,
+                self.exchange.components[target].cycle,
                 self.assets,
-                self.exchange.components['EOS'].accounts,
+                self.exchange.components[target].accounts,
             )
         )
         num_target_got = self.exchange.redeem(
@@ -228,9 +224,9 @@ class Trader:
             bot_logger.error(
                 "%s: Failed to redeem, you have %s, accounts %s"
                 % (
-                    self.exchange.components['EOS'].cycle,
+                    self.exchange.components[target].cycle,
                     self.assets,
-                    self.exchange.components['EOS'].accounts,
+                    self.exchange.components[target].accounts,
                 )
             )
             return False
@@ -307,15 +303,16 @@ class Statistics:
 
 
 def run():
-    exchange = Exchange(['EOS', 'USDT'])
+    exchange = Exchange([EOS, OMG])
     statistic_tool = Statistics()
     trader = Trader(
         source=EOS,
-        target=USDT,
+        target=OMG,
         assets={
-            EOS:  1000,
-            USDT: 1000,
-            NTL: 0,
+            EOS:  Decimal('1000'),
+            OMG: Decimal('1000'),
+            USDT: Decimal('1000'),
+            NTL: Decimal('0'),
         },
         exchange=exchange,
     )
@@ -337,7 +334,6 @@ def run():
 
 
 def main():
-    bot_logger.setLevel(logging.DEBUG)
     result = run()
     return result
 
