@@ -1,4 +1,6 @@
-NLT_accounts = {}
+NLT_accounts = {
+    'the-god': 1000 * 1500
+}
 NLT_reserve = {}
 NLT_components = {}
 NLT_AUCTION_WINDOW = 360
@@ -143,9 +145,12 @@ class Component:
                 self.min_bid = 1  # set to the inital value
             return redeemed
         else:
-            raise Exception('out of balance', self.balance(sender))
+            return None
+            # raise Exception('out of balance', self.balance(sender))
 
     def redeem(self, sender: str, quantity: float) -> float:
         assert quantity % 1000 == 0
+        if quantity == 0:
+            yield None
         for _ in range(0, int(quantity / 1000)):
             yield self.redeem_1000(sender)
