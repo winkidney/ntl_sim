@@ -29,12 +29,20 @@ class Component:
         if self.start_timestamp == -1:
             self.start_timestamp = timestamp
         if self.cycle > self.current_cycle:
-            print('%s:: New cycle %s' % (self.token, self.cycle))
+            # print('%s:: New cycle %s' % (self.token, self.cycle))
             self.update_status()
         return self
 
     def __repr__(self):
         return '%s %s => %s NTL' % (self.reserve, self.token, self.total_supply)
+
+    @property
+    def ntl_reserve(self):
+        return NLT_reserve[self.token]
+
+    @ntl_reserve.setter
+    def ntl_reserve(self, v):
+        NLT_reserve[self.token] = v
 
     @property
     def reserve(self):
@@ -51,10 +59,6 @@ class Component:
     @property
     def last_minted(self):
         return self.minted.get(self.last_cycle)
-
-    def get_redeem_amount(self, quantity):
-        assert quantity % 1000 == 0
-        return sum([v['bid'] for v in self.minted.values()][-(int(quantity / 1000)):])
 
     def get_cycle(self, winner: str) -> list:
         return [
@@ -131,26 +135,27 @@ class Component:
     def redeem_all(self, sender) -> float:
         return self.redeem(sender, self.balance(sender))
 
-    def redeem_1000(self, sender):
+    def get_num_redeemed(self, num_ntl):
+        redeemed = self.ntl_reserve / float(self.reserve) * num_ntl
+        if redeemed > self.ntl_reserve:
+            redeemed = self.ntl_reserve
+        return redeemed
+
+    def get_redeem_price_per_k(self):
+        return self.reserve * 1000 / self.ntl_reserve
+
+    def redeem(self, sender, num_ntl):
+        assert num_ntl >= 0
         print('redeeming 1000 for %s, reserve is %s' % (self.token, self.reserve))
-        redeemed = self.min_bid
-        assert redeemed <= self.reserve
+        redeemed = self.get_num_redeemed(num_ntl)
         self.reserve = self.reserve - redeemed
-        if self.burn_token(sender, 1000):
-            keys = list(self.minted.keys())
+        self.ntl_reserve = self.ntl_reserve - num_ntl
+        if self.burn_token(sender, num_ntl):
             if len(self.minted) > 1:
-                self.min_bid = list(self.minted.values())[-2]['bid']
-                del self.minted[keys[-1]]
+                self.min_bid = self.get_redeem_price_per_k()
             else:
                 self.min_bid = 1  # set to the inital value
             return redeemed
         else:
             return None
             # raise Exception('out of balance', self.balance(sender))
-
-    def redeem(self, sender: str, quantity: float) -> float:
-        assert quantity % 1000 == 0
-        if quantity == 0:
-            yield None
-        for _ in range(0, int(quantity / 1000)):
-            yield self.redeem_1000(sender)

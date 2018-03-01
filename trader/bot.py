@@ -2,9 +2,6 @@ from collections import defaultdict
 import logging
 import pandas as pd
 
-from sim.netrual import Component
-
-
 EOS = 'EOS'
 OMG = 'OMG'
 USDT = 'USDT'
@@ -51,20 +48,15 @@ def get_price_with_impact_cost(min_price, premium_rate):
 
 def get_auction_premium_rate():
     # return random.randint(1, 20) / 100.0
-    return 0.03
+    return 0.02
 
 
 def get_redeem_premium_rate():
-    return 0.01
+    return 0.02
 
 
 def get_ntl_flat_price_for_component(component_last_bid, component_flat_price):
     return component_last_bid * component_flat_price
-
-
-def get_redeem_amount(ntl_total_amount):
-    if ntl_total_amount > 0:
-        return 1000
 
 
 def is_auction_ok(current_price_of_ntl, average_price_of_ntl_per_k):
@@ -72,7 +64,7 @@ def is_auction_ok(current_price_of_ntl, average_price_of_ntl_per_k):
         current_price_of_ntl,
         get_auction_premium_rate()
     )
-    # print("avg and current: ", average_price_of_ntl_per_k, current_price_of_ntl)
+    # print("auction avg and current: ", average_price_of_ntl_per_k, current_price_of_ntl)
     return (
         average_price_of_ntl_per_k > current_price_of_ntl,
         (average_price_of_ntl_per_k - current_price_of_ntl) / float(
@@ -85,7 +77,7 @@ def is_redeem_ok(current_price_of_ntl, average_price_of_ntl_per_k):
         current_price_of_ntl,
         get_redeem_premium_rate()
     )
-    print("avg and current: ", average_price_of_ntl_per_k, current_price_of_ntl)
+    # print("redeem detection avg and current: ", average_price_of_ntl_per_k, current_price_of_ntl)
     return (
         average_price_of_ntl_per_k < current_price_of_ntl,
         (
@@ -94,6 +86,119 @@ def is_redeem_ok(current_price_of_ntl, average_price_of_ntl_per_k):
             )
         )
     )
+
+
+NUM_tokens = dict(
+    (
+        (OMG, 0),
+        (EOS, 0),
+        # (ELF, 10 * 1000),
+        # (USDT, 10 * 1000),
+        # (QTUM, 10 * 1000),
+    )
+)
+
+NLT_reserve = dict(
+    (
+        (OMG, 0),
+        (EOS, 0),
+        # (ELF, 100 * 100 * 10 * 2),
+        # (USDT, 100 * 100 * 10 * 2),
+        # (QTUM, 100 * 100 * 10 * 60),
+    )
+)
+
+NLT_accounts = {
+    'the-god': sum((value for value in NLT_reserve.values()))
+}
+NLT_components = {}
+NLT_AUCTION_WINDOW = 360
+
+
+class Component:
+    min_bid = float(1)
+    timestamp = 0
+    auction_window = NLT_AUCTION_WINDOW
+
+    def __init__(self, token):
+        self.minted = {}
+        self.token = token
+        self.reserves = NLT_reserve
+        self.token_reserves = NUM_tokens
+        self.components = NLT_components
+        self.components[token] = self
+        self.accounts = NLT_accounts
+
+    def __call__(self, timestamp: float):
+        self.timestamp = timestamp
+        return self
+
+    def __repr__(self):
+        return '%s %s => %s NTL' % (
+            self.token_reserve, self.token, self.total_supply
+        )
+
+    @property
+    def total_supply(self) -> float:
+        return sum(list(self.reserves.values()))
+
+    @property
+    def ntl_reserve(self):
+        return self.reserves[self.token]
+
+    @ntl_reserve.setter
+    def ntl_reserve(self, v):
+        self.reserves[self.token] = v
+
+    @property
+    def token_reserve(self):
+        return self.token_reserves[self.token]
+
+    def auction(self, bid: float):
+        bid = float(bid)
+        assert bid > self.min_bid
+        if bid > self.min_bid:
+            self.min_bid = bid
+        self.token_reserve = self.token_reserve + bid
+        self.ntl_reserve = self.ntl_reserve + 1000
+        print(
+            'do auction for 1000 ntl by %s %s' % (
+                bid,
+                self.token,
+            )
+        )
+        return True
+
+    @token_reserve.setter
+    def token_reserve(self, v):
+        self.token_reserves[self.token] = v
+
+    def get_num_redeemed(self, num_ntl):
+        redeemed = self.token_reserve / float(self.ntl_reserve) * num_ntl
+        if redeemed > self.ntl_reserve:
+            redeemed = self.ntl_reserve
+        return redeemed
+
+    def get_redeem_price_per_k(self):
+        return self.token_reserve * 1000 / self.ntl_reserve
+
+    def redeem(self, num_ntl):
+        assert num_ntl >= 0
+        redeemed = self.get_num_redeemed(num_ntl)
+        print(
+            'redeeming %s for %s ntl, reserve is %s, redeemed %s' % (
+                self.token,
+                num_ntl,
+                self.token_reserve,
+                redeemed,
+            )
+        )
+        self.token_reserve = self.token_reserve - redeemed
+        if self.token_reserve < 0:
+            import pdb;pdb.set_trace()
+        self.ntl_reserve = self.ntl_reserve - num_ntl
+        self.min_bid = self.get_redeem_price_per_k()
+        return redeemed
 
 
 class Exchange:
@@ -130,16 +235,37 @@ class Exchange:
         for symbol, component in self.components.items():
             total_supply = component.total_supply
             flat_price = self.get_flat_price(symbol)
-            valued += flat_price * component.reserve
+            valued += flat_price * component.token_reserve
+        if total_supply == 0:
+            # Maybe has bug
+            return 0
+        result = valued / total_supply * 1000
+        # if result <= 0:
+        #     import pdb;pdb.set_trace()
+        return result
+
+    def get_after_ntl_value_per_k(self, symbol, num_ntl2redeem):
+        component = self.components[symbol]
+        redeemed = component.get_num_redeemed(num_ntl2redeem)
+        total_supply = component.total_supply
+
+        valued = 0
+        for _symbol, component in self.components.items():
+            reserved = component.token_reserve
+            if symbol == _symbol:
+                reserved -= redeemed
+            flat_price = self.get_flat_price(_symbol)
+            valued += flat_price * reserved
+        total_supply -= num_ntl2redeem
         if total_supply == 0:
             # Maybe has bug
             return 0
         return valued / total_supply * 1000
 
-    def get_current_price_for_symbol(self, symbol):
+    def get_current_price_for_symbol_per_k(self, symbol):
         component = self.components[symbol]
         flat_price = self.get_flat_price(symbol)
-        return component.min_bid * float(flat_price)
+        return component.get_redeem_price_per_k() * float(flat_price)
 
     def update_kline(self):
         for symbol in self.symbols:
@@ -154,13 +280,14 @@ class Exchange:
         self.current_index += 1
 
     def bootstrap(self):
-        for x in range(100):
-            self.update_kline()
-            for name, component in self.components.items():
-                if name == ELF:
-                    component.auction('the-god', 1 + x)
-                else:
-                    component.auction('the-god', 0.1 + x / 10.0)
+        self.update_kline()
+        ntl_total = 1000 * 1000 * 1000
+        total_value = 1000 * 1000
+        for symbol in self.symbols:
+            component = self.components[symbol]
+            component.ntl_reserve = ntl_total
+            component.token_reserve = total_value / self.current_prices[symbol]
+
 
     def get_flat_price(self, symbol):
         return self.current_prices[symbol]
@@ -169,32 +296,30 @@ class Exchange:
         component = self.components[token_name]
         return component.min_bid
 
-    def redeem(self, symbol, sender_name, num_ntl):
+    def get_num_redeemed(self):
+        pass
+
+    def redeem(self, symbol, num_ntl):
         """
         return token.
         """
         component = self.components[symbol]
-        _redeemed = component.redeem(sender_name, num_ntl)
-        num_redeemed = 0
+        _redeemed = component.redeem(num_ntl)
         ntl_cost = 0
-        for redeemed in _redeemed:
-            if redeemed is None:
-                continue
-            ntl_cost += 1000
-            num_redeemed += redeemed
-        # num_redeemed = _redeemed
+        num_redeemed = _redeemed
+        if num_redeemed != 0:
+            ntl_cost = num_ntl
         return num_redeemed, ntl_cost
 
-    def buy(self, num_token, symbol, sender_name):
+    def buy(self, num_token, symbol):
         """
         To buy given number of NTL buy token.
         Return num_amount of ntl if succeed, None if failed
         :param num_token: 10
         :param symbol: for example EOS
-        :param sender_name: trader_name
         """
         component = self.components[symbol]
-        result = component.auction(sender_name, num_token)
+        result = component.auction(num_token)
         if result:
             return self.num_ntl_each_round
         return None
@@ -224,15 +349,16 @@ class Trader:
         """
         redeem_result = []
         for symbol in self.symbols:
+            # print("auction detection for %s: " % symbol)
             auction_ok, rate = is_auction_ok(
-                self.exchange.get_current_price_for_symbol(symbol),
+                self.exchange.get_current_price_for_symbol_per_k(symbol),
                 self.exchange.get_ntl_average_price_per_k(),
             )
             if auction_ok:
                 self.do_transition(symbol, get_auction_premium_rate())
                 continue
             redeem_ok, return_rate = is_redeem_ok(
-                self.exchange.get_current_price_for_symbol(symbol),
+                self.exchange.get_current_price_for_symbol_per_k(symbol),
                 self.exchange.get_ntl_average_price_per_k(),
             )
             if redeem_ok:
@@ -252,17 +378,17 @@ class Trader:
 
         if self.assets[source] < source_cost:
             bot_logger.error(
-                "Source cost is too much, %s, price is %s"
-                % (source_cost, price)
+                "Source cost is too much for %s, %s, price is %s"
+                % (source_cost, source, price)
             )
             return False
-        ntl_got = self.exchange.buy(source_cost, source, self.name)
+        ntl_got = self.exchange.buy(source_cost, source)
         if ntl_got is None:
             bot_logger.error(
                 "You do with %s auction at cycle: %s but got no ntl"
                 % (
                     source,
-                    self.exchange.components[source].cycle,
+                    self.exchange.components[source].timestamp,
                 )
             )
             return False
@@ -272,30 +398,32 @@ class Trader:
         return True
 
     def do_redeem(self, target, num_ntl):
+        error_msg = (
+            "%s: Failed to redeem %s, you have %s"
+            % (
+                self.exchange.components[target].timestamp,
+                target,
+                self.assets,
+            )
+        )
+        if num_ntl == 0:
+            bot_logger.error("No ntl, " + error_msg)
+            return False
         bot_logger.debug(
             "%s: redeeming, you have %s, accounts %s"
             % (
-                self.exchange.components[target].cycle,
+                self.exchange.components[target].timestamp,
                 self.assets,
                 self.exchange.components[target].accounts,
             )
         )
         num_target_got, ntl_cost = self.exchange.redeem(
             target,
-            self.name,
             num_ntl,
         )
         self.assets[NTL] -= ntl_cost
         self.assets[target] += num_target_got
         if num_target_got == 0:
-            bot_logger.error(
-                "%s: Failed to redeem, you have %s, accounts %s"
-                % (
-                    self.exchange.components[target].cycle,
-                    self.assets,
-                    self.exchange.components[target].accounts,
-                )
-            )
             return False
         return True
 
@@ -316,7 +444,7 @@ class Statistics:
                 exchange.components[symbol].min_bid
             )
             self.reversed_amounts[symbol].append(
-                exchange.components[symbol].reserve
+                exchange.components[symbol].token_reserve
             )
             self.ntl_total_supply_amounts[symbol].append(
                 exchange.components[symbol].total_supply
@@ -378,18 +506,19 @@ class Statistics:
 
 
 def run():
-    symbols = [EOS, OMG, ELF, USDT, QTUM]
+    # symbols = [EOS, OMG, ELF, USDT, QTUM]
+    symbols = [EOS, OMG]
     exchange = Exchange(symbols)
     statistic_tool = Statistics()
     trader = Trader(
         symbols=symbols,
         assets={
-            EOS:  1000,
-            OMG: 1000,
-            USDT: 1000 * 10,
-            QTUM: 1000,
-            ELF: 1000 * 10,
-            NTL: 0,
+            EOS:  1000 * 100,
+            OMG: 1000 * 100,
+            # USDT: 1000 * 100,
+            # QTUM: 1000 * 100,
+            # ELF: 1000 * 100,
+            NTL: 1000 * 10000,
         },
         exchange=exchange,
     )
